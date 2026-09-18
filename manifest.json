@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Cacher for Claude",
+  "version": "0.1.0",
+  "description": "Save claude.ai prompts together with their attached files, and re-insert them later.",
+  "minimum_chrome_version": "116",
+  "permissions": ["sidePanel", "storage", "unlimitedStorage", "scripting", "activeTab", "tabs"],
+  "host_permissions": ["https://claude.ai/*"],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Prompt Cacher"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Ctrl+Shift+Y", "mac": "Command+Shift+Y" },
+      "description": "Open Prompt Cacher"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": [
+        "src/content/selectors.js",
+        "src/content/bridge.js",
+        "src/content/extract.js",
+        "src/content/composer.js",
+        "src/content/main.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/bridge/bridge.html"],
+      "matches": ["https://claude.ai/*"]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+helpful_info/
+.DS_Store
+node_modules/
+docs/design-notes.md

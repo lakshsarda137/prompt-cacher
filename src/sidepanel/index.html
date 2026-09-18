@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prompt Cacher</title>
+    <link rel="stylesheet" href="panel.css" />
+    <script type="module" src="panel.js"></script>
+  </head>
+  <body>
+    <!-- Library view -->
+    <section id="library-view" class="view">
+      <header class="bar">
+        <div class="brand">
+          <span class="logo" aria-hidden="true"><span data-icon="bookmark"></span></span>
+          <span>Prompt Cacher</span>
+        </div>
+        <button id="save-current" class="btn btn-primary" title="Save the prompt and files currently in the claude.ai message box">
+          <span data-icon="plus"></span>Save from chat
+        </button>
+      </header>
+
+      <div class="search">
+        <span class="search-icon" data-icon="search"></span>
+        <input id="search" type="search" placeholder="Search prompts, files, tags" autocomplete="off" autofocus />
+        <kbd class="search-hint">Enter to insert</kbd>
+      </div>
+
+      <div id="status" class="notice" role="status" hidden></div>
+
+      <ul id="results" class="cards"></ul>
+
+      <div id="empty" class="empty" hidden>
+        <span class="empty-icon" data-icon="stack"></span>
+        <p id="empty-title" class="empty-title"></p>
+        <p id="empty-body" class="empty-body"></p>
+      </div>
+
+      <footer id="library-size" class="foot"></footer>
+    </section>
+
+    <!-- Save / edit form -->
+    <section id="form-view" class="view" hidden>
+      <header class="bar">
+        <button id="f-back" class="btn btn-icon" title="Back" aria-label="Back"><span data-icon="back"></span></button>
+        <h1 id="form-title" class="bar-title">Save prompt</h1>
+      </header>
+
+      <div class="form-body">
+        <div id="form-status" class="notice" role="status" hidden></div>
+
+        <label class="field">
+          <span class="label">Title</span>
+          <input id="f-title" type="text" placeholder="e.g. PSYC 101 practice questions" />
+        </label>
+
+        <label class="field">
+          <span class="label">Tags <span class="hint">comma separated</span></span>
+          <input id="f-tags" type="text" placeholder="psych, revision" />
+        </label>
+
+        <label class="field">
+          <span class="label">Prompt</span>
+          <textarea id="f-prompt" rows="7"></textarea>
+        </label>
+
+        <div class="field">
+          <div class="label-row">
+            <span class="label">Files <span id="f-count" class="hint"></span></span>
+            <button id="f-add-file" type="button" class="btn btn-text"><span data-icon="plus"></span>Add from disk</button>
+          </div>
+          <ul id="f-files" class="files"></ul>
+        </div>
+      </div>
+
+      <footer class="form-foot">
+        <button id="f-cancel" type="button" class="btn btn-secondary">Cancel</button>
+        <button id="f-save" type="button" class="btn btn-primary">Save</button>
+      </footer>
+    </section>
+  </body>
+</html>
