@@ -29,7 +29,7 @@ Everything stays on your computer. The extension does not send your prompts or f
 
 1. On claude.ai, type your prompt and attach your files as usual.
 2. Click **Save prompt** above the message box. The Prompt Cacher panel opens.
-3. Give the prompt a title and, if you like, some tags. Each file shows "Saving a copy…" and then its size once the copy is stored.
+3. Give the prompt a title and, if you like, some tags. Each file shows "Saving a copy…" and then its size once the copy is stored. A large file can take a few seconds, because claude.ai has to finish uploading it first.
 4. Click **Save**.
 
 **Reuse a prompt**
@@ -95,5 +95,6 @@ A note on `bridge`: scripts inside the claude.ai page cannot write to the extens
 - **claude.ai can change.** The extension depends on how the claude.ai page is built and on web addresses claude.ai uses internally. If claude.ai changes them, saving or inserting may stop working until the extension is updated. The page details live in `src/content/selectors.js` and `src/content/extract.js`.
 - **Insert replaces the message box.** Anything already typed there is cleared.
 - **Linked files can go missing.** A file linked from your computer (instead of copied) stops working if you move or rename it. The panel marks it, and you can link it again.
+- **Slow uploads.** An attachment cannot be copied until claude.ai has finished uploading it. The extension waits up to 90 seconds per file, then offers to link the file from disk instead.
 - **Disk space.** Copies take up real space. The panel footer shows how much the library uses.
 - **Search matches words, not meaning.** Searching "memory" will not find a prompt that only says "recall". Search by meaning is planned.

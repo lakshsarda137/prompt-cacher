@@ -1,5 +1,8 @@
-// Service worker: opens the side panel, hands out the bridge token, and tells the side
-// panel when a Save draft is ready. No file bytes ever pass through here.
+// Service worker: opens the side panel, hands out the bridge token, and creates the
+// draft record for a Save. Only text passes through here. File bytes go straight from
+// the claude.ai page to the extension's database through the bridge iframe.
+
+import { put, newId } from './db/db.js';
 
 const CLAUDE_URL = /^https:\/\/claude\.ai\//;
 
@@ -44,12 +47,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch((error) => sendResponse({ ok: false, error: String(error?.message || error) }));
       return true;
 
-    case 'pc:draftReady':
+    case 'pc:createDraft': {
+      // The first step of a Save. Kept here rather than in the bridge iframe so the
+      // side panel can show the form without waiting for the iframe to load.
       if (!fromClaudeTab) return false;
-      chrome.storage.session
-        .set({ pendingDraft: { draftId: message.draftId, tabId: sender.tab.id, at: Date.now() } })
-        .then(() => sendResponse({ ok: true }));
+      const draft = {
+        id: newId(),
+        promptText: message.promptText || '',
+        attachments: (message.names || []).map((name) => ({ name, status: 'pending', fileId: null, note: '' })),
+        createdAt: Date.now(),
+      };
+      put('drafts', draft)
+        .then(() => chrome.storage.session.set({
+          pendingDraft: { draftId: draft.id, tabId: sender.tab.id, at: Date.now() },
+        }))
+        .then(() => sendResponse({ draftId: draft.id }))
+        .catch((error) => sendResponse({ error: String(error?.message || error) }));
       return true;
+    }
 
     case 'pc:draftFailed':
       if (!fromClaudeTab) return false;

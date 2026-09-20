@@ -565,9 +565,11 @@ chrome.storage.session.onChanged.addListener((changes) => {
 });
 
 (async () => {
-  await db.sweepStale().catch(() => {});
-  await loadLibrary();
+  // A pending save comes first: the form should appear without waiting for the
+  // library to load.
   const { pendingDraft } = await chrome.storage.session.get('pendingDraft');
   await handlePendingDraft(pendingDraft);
-  $('search').focus();
+  await loadLibrary();
+  if (!state.form) $('search').focus();
+  db.sweepStale().catch(() => {});
 })();

@@ -47,14 +47,20 @@ globalThis.__pc = globalThis.__pc || {};
   async function captureDraft() {
     if (capturing) return;
     capturing = true;
+    const t0 = performance.now();
+    const since = () => `${Math.round(performance.now() - t0)} ms`;
     try {
       const promptText = __pc.readPromptText();
       const chips = __pc.readAttachments();
       if (!promptText && !chips.length) throw new Error('The message box is empty. Type a prompt or attach files first.');
 
       // Open the form straight away with the text and filenames...
-      const { draftId } = await __pc.bridgeCall('createDraft', { promptText, names: chips.map((c) => c.name) });
-      await chrome.runtime.sendMessage({ type: 'pc:draftReady', draftId });
+      const created = await chrome.runtime.sendMessage({
+        type: 'pc:createDraft', promptText, names: chips.map((c) => c.name),
+      });
+      if (!created?.draftId) throw new Error(created?.error || 'Could not start the save.');
+      const { draftId } = created;
+      console.debug(`[Prompt Cacher] form ready after ${since()} (${chips.length} file(s) to copy)`);
 
       // ...then fill in each file as its copy finishes.
       await __pc.captureAttachments(chips, async (index, result) => {
@@ -68,6 +74,7 @@ globalThis.__pc = globalThis.__pc || {};
             note: `Could not store the copy (${error.message}). Link it from disk.`,
           }).catch(() => {});
         }
+        console.debug(`[Prompt Cacher] "${result.name}" ${result.blob ? `copied (${result.blob.size} bytes)` : 'not copied'} after ${since()}`);
         chrome.runtime.sendMessage({ type: 'pc:draftProgress', draftId, index }).catch(() => {});
       });
     } catch (error) {

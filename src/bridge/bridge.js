@@ -7,7 +7,7 @@
 // chrome.storage.session, which claude.ai page scripts cannot read, so the page itself
 // cannot talk to this bridge even though it can see the iframe.
 
-import { put, get, del, newId, openDb } from '../db/db.js';
+import { get, del, newId, openDb } from '../db/db.js';
 
 const CLAUDE_ORIGIN = 'https://claude.ai';
 
@@ -16,20 +16,8 @@ const ops = {
     return 'pong';
   },
 
-  // Step 1 of a Save: record the prompt and filenames right away so the side panel
-  // can show the form before any file has finished downloading.
-  async createDraft({ promptText, names }) {
-    const draft = {
-      id: newId(),
-      promptText,
-      attachments: names.map((name) => ({ name, status: 'pending', fileId: null, note: '' })),
-      createdAt: Date.now(),
-    };
-    await put('drafts', draft);
-    return { draftId: draft.id };
-  },
-
-  // Step 2, once per file as its copy finishes: store the bytes and mark it done.
+  // Called once per file as its copy finishes: store the bytes and mark it done.
+  // The draft itself is created by the background worker (see src/background.js).
   // File record and draft update happen in one transaction so parallel calls can't
   // overwrite each other.
   async fillDraftFile({ draftId, index, name, type, blob, note }) {

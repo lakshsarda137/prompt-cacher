@@ -170,39 +170,59 @@ globalThis.__pc = globalThis.__pc || {};
         errors.push(error.message);
       }
     }
-    const why = errors.length ? `download failed (${errors[0]})` : 'not found in the claude.ai draft';
+    const why = errors.length
+      ? `download failed (${errors[0]})`
+      : 'claude.ai did not finish uploading it in time';
     return { name, type: '', blob: null, note: `Could not copy: ${why}. Link it from disk.` };
   }
 
   // chips: from readAttachments(). Calls onResult(index, { name, type, blob|null, note })
   // as soon as each file is ready, so small files don't wait for big ones.
+  //
+  // An attachment card shows up as soon as the file is picked, but claude.ai only
+  // writes the draft record once its upload finishes. A large image or slide deck can
+  // take a while, so each file is waited for separately, up to WAIT_MS, and downloaded
+  // the moment its record appears.
+  const WAIT_MS = 90_000;
+  const POLL_MS = 300;
+
   __pc.captureAttachments = async function captureAttachments(chips, onResult) {
     if (!chips.length) return;
     const names = chips.map((c) => c.name);
+    const waiting = new Set(chips.map((_, i) => i));
+    const downloads = [];
 
-    // claude.ai writes its draft a moment after a file is attached. Usually it is
-    // already there; only wait if a file just attached is still missing.
-    let draft = null;
-    for (let attempt = 0; attempt < 6; attempt++) {
-      draft = pickDraft(await readDrafts(), names);
-      const known = draft ? [...draft.files, ...draft.attachments].map((x) => x.file_name) : [];
-      if (draft && names.every((n) => known.includes(n))) break;
-      await sleep(250);
-    }
-
-    // Match chips to draft entries, consuming each entry once (duplicate names).
-    const files = [...(draft?.files || [])];
-    const texts = [...(draft?.attachments || [])];
-    const take = (list, name) => {
-      const i = list.findIndex((x) => x.file_name === name);
-      return i === -1 ? null : list.splice(i, 1)[0];
+    const start = (index, entry) => {
+      waiting.delete(index);
+      const { name, thumbnailPdfUrl } = chips[index];
+      downloads.push(captureOne(name, entry, thumbnailPdfUrl).then((result) => onResult(index, result)));
     };
 
-    await Promise.all(chips.map(async ({ name, thumbnailPdfUrl }, index) => {
-      const file = take(files, name);
-      const text = file ? null : take(texts, name);
-      const entry = file ? { kind: 'file', entry: file } : text ? { kind: 'text', entry: text } : null;
-      await onResult(index, await captureOne(name, entry, thumbnailPdfUrl));
-    }));
+    // Several attachments can share a name, so the nth card with a given name takes
+    // the nth draft entry with that name. Counted over all cards, not just the ones
+    // still waiting, so a card that already matched keeps its entry.
+    const rank = chips.map((chip, i) => chips.slice(0, i).filter((c) => c.name === chip.name).length);
+
+    const deadline = Date.now() + WAIT_MS;
+    while (waiting.size && Date.now() < deadline) {
+      const draft = pickDraft(await readDrafts(), names);
+      if (draft) {
+        for (const index of [...waiting].sort((a, b) => a - b)) {
+          const name = chips[index].name;
+          const matches = [
+            ...draft.files.filter((f) => f.file_name === name).map((entry) => ({ kind: 'file', entry })),
+            ...draft.attachments.filter((a) => a.file_name === name).map((entry) => ({ kind: 'text', entry })),
+          ];
+          if (matches[rank[index]]) start(index, matches[rank[index]]);
+        }
+      }
+      if (waiting.size) await sleep(POLL_MS);
+    }
+
+    // Never showed up: claude.ai may still be uploading, or the file is not one it
+    // keeps. captureOne falls back to the PDF thumbnail route where it can.
+    for (const index of [...waiting]) start(index, null);
+
+    await Promise.all(downloads);
   };
 })();
