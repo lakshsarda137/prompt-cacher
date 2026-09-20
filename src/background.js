@@ -32,17 +32,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'pc:openSidePanel':
       // Called synchronously from the Save button click so the user gesture still counts.
       if (!sender.tab) return false;
-      const requestedAt = Date.now();
+      // Written before the panel opens, so the draft that follows always replaces it.
+      // Writing it afterwards raced with pc:createDraft and could erase the draft.
+      chrome.storage.session.set({
+        pendingDraft: { capturing: true, tabId: sender.tab.id, at: Date.now() },
+      });
       chrome.sidePanel
         .open({ tabId: sender.tab.id })
-        .then(async () => {
-          // Don't clobber a draft that finished while the panel was opening.
-          const { pendingDraft } = await chrome.storage.session.get('pendingDraft');
-          if (pendingDraft && pendingDraft.at >= requestedAt) return;
-          await chrome.storage.session.set({
-            pendingDraft: { capturing: true, tabId: sender.tab.id, at: requestedAt },
-          });
-        })
         .then(() => sendResponse({ ok: true }))
         .catch((error) => sendResponse({ ok: false, error: String(error?.message || error) }));
       return true;

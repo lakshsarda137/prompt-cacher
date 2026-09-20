@@ -300,6 +300,8 @@ async function openDraftForm(draftId) {
     })),
     removedFileIds: [],
   };
+  watchToken++; // the draft arrived; stop any watcher
+  showStatus('status', '');
   $('form-title').textContent = 'Save prompt';
   $('f-title').value = defaultTitle(draft.promptText, names);
   $('f-tags').value = '';
@@ -505,12 +507,45 @@ function closeForm() {
 // ---------------------------------------------------------------------------
 // Capture (drafts arrive from the content script via chrome.storage.session)
 
+let watchToken = 0;
+
+// The content script creates the draft and the background worker points us at it. If
+// that signal is lost, this finds the draft in the database instead of waiting forever.
+async function watchForDraft(startedAt) {
+  const token = ++watchToken;
+  const deadline = Date.now() + 25_000;
+  while (token === watchToken && !state.form && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 600));
+    if (token !== watchToken || state.form) return;
+    const { pendingDraft } = await chrome.storage.session.get('pendingDraft');
+    if (pendingDraft?.draftId || pendingDraft?.error) {
+      await handlePendingDraft(pendingDraft);
+      return;
+    }
+    const drafts = await db.getAll('drafts');
+    const draft = drafts
+      .filter((d) => d.createdAt >= startedAt - 3000)
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
+    if (draft) {
+      await chrome.storage.session.remove('pendingDraft');
+      await openDraftForm(draft.id);
+      return;
+    }
+  }
+  if (token === watchToken && !state.form) {
+    showStatus('status', 'claude.ai did not respond to the save. Refresh the claude.ai tab and try again.', true);
+  }
+}
+
 async function handlePendingDraft(pending) {
   if (!pending) return;
   if (pending.capturing) {
     showStatus('status', 'Reading the prompt and attachments from claude.ai…');
+    watchForDraft(pending.at || Date.now());
     return;
   }
+  watchToken++; // stop any watcher
+
   await chrome.storage.session.remove('pendingDraft');
   if (pending.error) {
     showStatus('status', pending.error, true);
@@ -530,6 +565,7 @@ async function saveFromChat() {
   try {
     const tab = await activeClaudeTab();
     showStatus('status', 'Reading the prompt and attachments from claude.ai…');
+    watchForDraft(Date.now());
     await sendToTab(tab.id, { type: 'pc:capture' });
   } catch (error) {
     showStatus('status', error.message, true);
